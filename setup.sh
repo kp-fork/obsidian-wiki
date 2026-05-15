@@ -33,30 +33,49 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_DIR="$SCRIPT_DIR/.skills"
 
-# Symlink every skill in SKILLS_DIR into TARGET_DIR.
-# Skips real directories to avoid data loss; updates stale symlinks.
-#
-# Args:
-#   $1 target_dir  — where to create the symlinks
-#   $2 label       — human-readable name for the summary line
-#   $3 mode        — "relative" for in-repo mirrors (matches the relative
-#                    paths committed to git, so `git status` stays clean
-#                    after install); "absolute" (default) for global dirs
-#                    like ~/.codex/skills that live outside the repo.
+# install_skills <target_dir> <label> [relative|absolute] [skill-subset...]
+# "relative" requires target_dir under $SCRIPT_DIR and emits ../-prefixed
+# targets matching the committed symlinks. Extra args restrict the install
+# to a named subset of skills (e.g. portable-only into ~/.claude/skills).
 install_skills() {
   local target_dir="$1"
   local label="$2"
   local mode="${3:-absolute}"
+  shift 3 || shift $#
+  local subset=("$@")  # empty = install all
+
+  case "$mode" in
+    relative|absolute) ;;
+    *) echo "install_skills: bad mode '$mode' (want relative|absolute)" >&2; exit 1 ;;
+  esac
+
+  local rel_prefix=""
+  if [ "$mode" = "relative" ]; then
+    # Strip $SCRIPT_DIR prefix; if it doesn't match, target is outside the
+    # repo and "relative" isn't meaningful — bail rather than emit a wrong link.
+    local rel="${target_dir#"$SCRIPT_DIR"/}"
+    if [ "$rel" = "$target_dir" ]; then
+      echo "install_skills: relative mode requires target under \$SCRIPT_DIR ($target_dir)" >&2
+      exit 1
+    fi
+    # One ../ per path component in $rel; e.g. .claude/skills → 2 components → ../../
+    local slashes="${rel//[^\/]/}"
+    local depth=$(( ${#slashes} + 1 )) i
+    for (( i=0; i<depth; i++ )); do rel_prefix="../$rel_prefix"; done
+  fi
+
   mkdir -p "$target_dir"
   for skill in "$SKILLS_DIR"/*/; do
     local skill_name link_path link_target
     skill_name="$(basename "$skill")"
+    if [ ${#subset[@]} -gt 0 ]; then
+      local match=0 want
+      for want in "${subset[@]}"; do [ "$want" = "$skill_name" ] && match=1 && break; done
+      [ "$match" = 1 ] || continue
+    fi
     link_path="$target_dir/$skill_name"
     if [ "$mode" = "relative" ]; then
-      # In-repo mirrors are always $REPO/<agent-dir>/skills, so the
-      # repo's .skills dir is two levels up. This matches the committed
-      # symlinks exactly and avoids leaking absolute home paths into git.
-      link_target="../../.skills/$skill_name"
+      link_target="${rel_prefix}.skills/$skill_name"
     else
       link_target="${skill%/}"
     fi
@@ -71,6 +90,8 @@ install_skills() {
       rm "$link_path"
     fi
     ln -s "$link_target" "$link_path"
+    # Sanity check: every skill ships a SKILL.md, so a working symlink resolves it.
+    [ -e "$link_path/SKILL.md" ] || { echo "install_skills: broken link $link_path → $link_target" >&2; exit 1; }
   done
   echo "✅  Installed skills → $label"
 }
@@ -151,22 +172,8 @@ for agent_dir in "${AGENT_DIRS[@]}"; do
 done
 
 # ── Step 3: Install global skills ────────────────────────────
-# ~/.claude/skills gets only the two portable skills (usable from any project)
-GLOBAL_SKILL_DIR="$HOME/.claude/skills"
-mkdir -p "$GLOBAL_SKILL_DIR"
-for skill_name in "wiki-update" "wiki-query"; do
-  link_path="$GLOBAL_SKILL_DIR/$skill_name"
-  if [ -L "$link_path" ]; then
-    rm "$link_path"
-  elif [ -d "$link_path" ]; then
-    echo "⚠️   $link_path is a real directory, skipping symlink"
-    continue
-  elif [ -f "$link_path" ]; then
-    rm "$link_path"
-  fi
-  ln -s "$SKILLS_DIR/$skill_name" "$link_path"
-done
-echo "✅  Installed global skills → ~/.claude/skills/ (wiki-update, wiki-query)"
+# ~/.claude/skills gets only the two portable skills (usable from any project).
+install_skills "$HOME/.claude/skills" "~/.claude/skills/ (wiki-update, wiki-query)" absolute wiki-update wiki-query
 
 # Steps 3b–3j: Install all skills for every supported agent.
 # OpenClaw discovers skills from ~/.agents/skills/ (per docs.openclaw.ai/skills);
