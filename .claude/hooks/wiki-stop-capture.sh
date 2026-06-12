@@ -23,6 +23,16 @@ print('1' if d.get('stop_hook_active') else '0')
 " 2>/dev/null || echo "0")
 [[ "$IS_HOOK_TURN" == "1" ]] && exit 0
 
+# Fire at most once per session — sentinel file keyed to session_id prevents
+# repeated nudges after the threshold is crossed on the first turn.
+SESSION_ID=$(printf '%s' "$INPUT" | python3 -c "
+import json, sys; print(json.load(sys.stdin).get('session_id', ''))" 2>/dev/null || echo "")
+SENTINEL=""
+if [[ -n "$SESSION_ID" ]]; then
+  SENTINEL="${TMPDIR:-/tmp}/wiki-stop-capture-${SESSION_ID}.done"
+  [[ -f "$SENTINEL" ]] && exit 0
+fi
+
 TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
@@ -70,6 +80,7 @@ BASH_COUNT=$(echo "$COUNTS" | awk '{print $2}')
 # Trigger if any file was written/edited, or if there were ≥ 4 shell calls
 # (suggesting investigation/debugging worth preserving).
 if [[ "${WRITE_EDIT:-0}" -ge 1 ]] || [[ "${BASH_COUNT:-0}" -ge 4 ]]; then
+  [[ -n "$SENTINEL" ]] && : > "$SENTINEL" 2>/dev/null || true
   echo "Session ended with ${WRITE_EDIT} file edit(s) and ${BASH_COUNT} shell call(s). Please run /wiki-capture --quick now to preserve any reusable findings before this context closes." >&2
   exit 2
 fi
