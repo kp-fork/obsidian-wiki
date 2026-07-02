@@ -765,6 +765,48 @@ def cmd_lint(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_query(result: dict[str, object]) -> None:
+    print(f"answer_type: {result['answer_type']}")
+    candidates = result.get("candidates", [])
+    if candidates:
+        print("candidates:")
+        for item in candidates:
+            print(f"- {item['title']} ({item['page']}) score={item['score']}")
+    path = result.get("path") or []
+    if path:
+        print("path:")
+        print(" -> ".join(path))
+    should_read = result.get("should_read") or []
+    if should_read:
+        print("should_read:")
+        for page in should_read:
+            print(f"- {page}")
+
+
+def cmd_query(args: argparse.Namespace) -> int:
+    from obsidian_wiki.graphrag import query
+
+    vault_arg = args.vault or _read_config_value("OBSIDIAN_VAULT_PATH")
+    if not vault_arg:
+        print("error: vault not configured; pass --vault or run obsidian-wiki setup", file=sys.stderr)
+        return 1
+
+    vault = Path(vault_arg).expanduser().resolve()
+    if not vault.is_dir():
+        print(f"error: vault not found: {vault}", file=sys.stderr)
+        return 1
+
+    result = query(vault, args.question, top_n=args.top, max_should_read=args.max_read)
+    if args.json:
+        if args.pretty:
+            print(json.dumps(result, indent=2))
+        else:
+            print(json.dumps(result))
+    else:
+        _print_query(result)
+    return 0
+
+
 def cmd_list(args: argparse.Namespace) -> int:
     for name in list_skills():
         print(name)
@@ -909,6 +951,18 @@ def build_parser() -> argparse.ArgumentParser:
     lt.add_argument("--pretty", action="store_true", help="pretty-print JSON output")
     lt.add_argument("--strict", action="store_true", help="exit non-zero on warnings as well as failures")
     lt.set_defaults(func=cmd_lint)
+
+    qq = sub.add_parser(
+        "query",
+        help="query the configured vault without passing the raw path each time",
+    )
+    qq.add_argument("question", help="question to ask against the vault index")
+    qq.add_argument("--vault", help="override OBSIDIAN_VAULT_PATH for this query")
+    qq.add_argument("--top", type=int, default=8, help="number of candidate pages to rank (default: 8)")
+    qq.add_argument("--max-read", type=int, default=3, help="max pages to return in should_read (default: 3)")
+    qq.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    qq.add_argument("--pretty", action="store_true", help="pretty-print JSON output")
+    qq.set_defaults(func=cmd_query)
 
     return p
 
