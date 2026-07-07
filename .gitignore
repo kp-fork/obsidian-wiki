@@ -3,6 +3,10 @@
 *.pyc
 __pycache__/
 
+# Skill creator benchmark/review workspaces and local packages
+.skills/*-workspace/
+.skills/packages/
+
 # Python build artifacts (pyproject.toml / `python -m build`)
 /dist/
 /build/
