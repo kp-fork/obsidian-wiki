@@ -438,6 +438,14 @@ Triggered by `wiki-lint --consolidate`. Switches from report-only to **act-and-r
 
 ### Consolidation actions (in order, after confirmation)
 
+**Pre-write snapshot** — before the first file write, check `git -C "$OBSIDIAN_VAULT_PATH" rev-parse --is-inside-work-tree`. If the vault is not a git repo, skip this step silently — no nagging, no suggesting `git init`. If it is, snapshot it:
+
+```bash
+git -C "$OBSIDIAN_VAULT_PATH" add -A && git -C "$OBSIDIAN_VAULT_PATH" commit -m "pre-wiki-lint snapshot" --quiet
+```
+
+A "nothing to commit" result is fine — the vault was already clean. If a snapshot commit was made, mention it in your final report so the user knows the run can be undone with `git -C "$OBSIDIAN_VAULT_PATH" revert` (or `reset`).
+
 #### Action 1: Fix broken wikilinks
 
 For each broken `[[Target]]` found in Check 2:

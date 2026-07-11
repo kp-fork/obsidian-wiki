@@ -97,6 +97,14 @@ Only act on **EXTRACTED** and **INFERRED** candidates. Include the confidence la
 
 ## Step 4: Apply Links
 
+**Pre-write snapshot** — before the first file write, check `git -C "$OBSIDIAN_VAULT_PATH" rev-parse --is-inside-work-tree`. If the vault is not a git repo, skip this step silently — no nagging, no suggesting `git init`. If it is, snapshot it:
+
+```bash
+git -C "$OBSIDIAN_VAULT_PATH" add -A && git -C "$OBSIDIAN_VAULT_PATH" commit -m "pre-cross-linker snapshot" --quiet
+```
+
+A "nothing to commit" result is fine — the vault was already clean. If a snapshot commit was made, mention it in your final report so the user knows the run can be undone with `git -C "$OBSIDIAN_VAULT_PATH" revert` (or `reset`).
+
 For each page with missing links:
 
 ### 4a: Inline linking (preferred)

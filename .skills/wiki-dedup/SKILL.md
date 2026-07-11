@@ -145,6 +145,14 @@ In **Audit mode**, stop here and ask: "Run `--merge` to interactively merge the 
 
 ## Step 5: Merge
 
+**Pre-write snapshot** — before the first file write, check `git -C "$OBSIDIAN_VAULT_PATH" rev-parse --is-inside-work-tree`. If the vault is not a git repo, skip this step silently — no nagging, no suggesting `git init`. If it is, snapshot it:
+
+```bash
+git -C "$OBSIDIAN_VAULT_PATH" add -A && git -C "$OBSIDIAN_VAULT_PATH" commit -m "pre-wiki-dedup snapshot" --quiet
+```
+
+A "nothing to commit" result is fine — the vault was already clean. If a snapshot commit was made, mention it in your final report so the user knows the run can be undone with `git -C "$OBSIDIAN_VAULT_PATH" revert` (or `reset`).
+
 For each `merge` verdict pair (in merge or auto-merge mode):
 
 In **merge mode**: show the pair and verdict, then ask: "Merge `[Page A]` into `[Page B]`? (yes/skip/review)". Skip on anything other than yes.
