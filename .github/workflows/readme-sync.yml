@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  readmes-change-together:
-    name: readmes-change-together
+  readme-translation-drift:
+    name: readme-translation-drift (advisory)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -27,16 +27,6 @@ jobs:
       - name: Test README sync checker
         run: python -m unittest discover -s tests -p 'test_readme_sync.py' -v
 
-      - name: Require README translations to change together
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Report README translation drift (never blocks merge)
         run: |
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            git diff --name-only "$BASE_SHA...$HEAD_SHA"
-          elif [[ "$BASE_SHA" =~ ^0+$ ]]; then
-            git ls-tree -r --name-only "$HEAD_SHA"
-          else
-            git diff --name-only "$BASE_SHA" "$HEAD_SHA"
-          fi | python tools/check_readme_sync.py
+          python tools/check_readme_sync.py || echo "::warning file=README_TW.md::README_TW.md is behind README.md. Run 'python tools/check_readme_sync.py' locally, then translate and backfill the pending changes."

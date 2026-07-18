@@ -568,7 +568,7 @@ claude
 
 ### 保持兩份 README 同步
 
-`README.md` 是英文文件，`README_TW.md` 是其繁體中文翻譯；兩者共同構成同一份文件介面。任何變更其中一個檔案的 PR，都必須在同一個 PR 中更新另一個檔案。兩份翻譯的標題、範例、連結與面向使用者的行為，應在結構與語意上保持一致。`readmes-change-together` CI job 會強制兩個檔案一起變更，而 reviewers 則負責評估翻譯品質。
+`README.md` 是英文文件，`README_TW.md` 是其繁體中文翻譯；兩者共同構成同一份文件介面。兩份翻譯的標題、範例、連結與面向使用者的行為，應在結構與語意上保持一致。同步是建議性的，不會擋下合併：`readme-translation-drift` CI job 只會在翻譯落後時提出回報。要補齊時，執行 `python tools/check_readme_sync.py` — 它會列出動到 `README.md` 但之後沒有更新 `README_TW.md` 的 commits，以及尚未翻譯的英文 diff — 接著將這些變更翻譯並補進 `README_TW.md`。翻譯品質由 reviewers 評估。
 
 ### 新增 skill
 
